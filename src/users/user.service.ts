@@ -63,4 +63,8 @@ export class UserService {
 
     return this.query.createUser(data);
   }
+
+  async setInfo(user: User, userInfo: PrismaJson.UserInfoType): Promise<void> {
+    await this.query.setInfo(user, userInfo);
+  }
 }

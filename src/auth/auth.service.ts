@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { UserService } from '@/users/user.service';
-import { hashCompare, hash } from '@/utils/helpers/hash';
+import { hashCompare } from '@/utils/helpers/hash';
 import { getTokenSignature } from '@/utils/helpers/token';
 import { UserRegisterDto } from '@/users/dto/user-register.dto';
 import type { AuthResponseType, TokensResponseType } from '@/utils/types';
@@ -19,14 +19,12 @@ import { authenticator } from 'otplib';
 import { toDataURL } from 'qrcode';
 import { CACHE_MANAGER, type CacheStore } from '@nestjs/cache-manager';
 import { convertDaysToMs, convertSecondsToMs } from '@/utils/helpers/formatters';
-import { PrismaService } from '@/prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private userService: UserService,
     private jwtService: JwtService,
-    private prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: CacheStore,
   ) {}
 
@@ -96,7 +94,7 @@ export class AuthService {
 
     await this.userService.updateUserRefreshToken(user, tokens.refreshToken);
 
-    await this.setUserInfo(user, userInfo);
+    await this.userService.setInfo(user, userInfo);
 
     return {
       user: plainToInstance(UserResponseDto, user),
@@ -176,19 +174,5 @@ export class AuthService {
         throw new BadRequestException('Invalid code!');
       }
     }
-  }
-
-  async setUserInfo(user: User, userInfo: PrismaJson.UserInfoType): Promise<void> {
-    await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        info: {
-          ip        : await hash(userInfo.ip),
-          userAgent : await hash(userInfo.userAgent),
-        },
-      },
-    });
   }
 }

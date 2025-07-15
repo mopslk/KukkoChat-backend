@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Prisma, User } from '@prisma/client';
+import { hash } from '@/utils/helpers/hash';
 
 @Injectable()
 export class UserQuery {
@@ -53,6 +54,20 @@ export class UserQuery {
   async createUser(data: Prisma.UserCreateInput) {
     return this.prisma.user.create({
       data,
+    });
+  }
+
+  async setInfo(user: User, userInfo: PrismaJson.UserInfoType) {
+    this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        info: {
+          ip        : await hash(userInfo.ip),
+          userAgent : await hash(userInfo.userAgent),
+        },
+      },
     });
   }
 }
