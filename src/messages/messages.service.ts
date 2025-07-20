@@ -9,6 +9,7 @@ import { NotificationsService } from '@/notifications/notifications.service';
 import { NotificationType } from '@/notifications/enums/events-enum';
 import { ChatQuery } from '@/queries/utils/chatQuery';
 import { formatChatMembers } from '@/utils/helpers/formatters';
+import { encrypt } from '@/utils/helpers/encrypt';
 
 @Injectable()
 export class MessagesService {
@@ -18,36 +19,38 @@ export class MessagesService {
     private notificationsService: NotificationsService,
   ) {}
 
-  getMessageAttachments(files: Express.Multer.File[]) {
+  mapMessageAttachments(files: Express.Multer.File[]) {
     return files.map((file) => ({
       type : getFileType(file.filename),
       path : getFileUrl(file.path),
     }));
   }
 
+  async getChatMemberIds(chatId: bigint, userId: bigint): Promise<string[]> {
+    const roomMembers = await this.chatQuery.getChatMembers(chatId);
+
+    return formatChatMembers(roomMembers, userId);
+  }
+
   async create(createMessageDto: CreateMessageDto, files: Express.Multer.File[], userId: bigint, chatId: bigint) {
-    const attachments = this.getMessageAttachments(files);
+    const attachments = this.mapMessageAttachments(files);
 
     try {
       const message = await this.query.createMessage({
-        message: {
-          content : createMessageDto.content,
-          chat_id : chatId,
-          user_id : userId,
-        },
-        attachments,
+        content : await encrypt(createMessageDto.content),
+        chat_id : chatId,
+        user_id : userId,
       });
 
-      const response = plainToInstance(MessageResponseDto, MessageResponseDto.from(message), {
+      const attachmentBatch = await this.query.createAttachments(attachments, message.id);
+      const messageWithAttachments = attachmentBatch.count === attachments.length ? attachments : [];
+
+      const response = plainToInstance(MessageResponseDto, MessageResponseDto.from(messageWithAttachments), {
         excludeExtraneousValues: true,
       });
 
-      const roomMembers = await this.chatQuery.getChatMembers(chatId);
-
-      const chatMemberIds = formatChatMembers(roomMembers, userId);
-
       await this.notificationsService.sendSocketEvent(
-        chatMemberIds,
+        await this.getChatMemberIds(chatId, userId),
         NotificationType.NewMessage,
         instanceToPlain(response),
       );
@@ -59,26 +62,26 @@ export class MessagesService {
   }
 
   async update(id: bigint, updateMessageDto: UpdateMessageDto, userId: bigint) {
-    const updatedMessage = await this.query.updateMessage({
-      message_id: id,
-      ...updateMessageDto,
-    });
+    try {
+      const updatedMessage = await this.query.updateMessage({
+        message_id : id,
+        content    : await encrypt(updateMessageDto.content),
+      });
 
-    const response = plainToInstance(MessageResponseDto, MessageResponseDto.from(updatedMessage), {
-      excludeExtraneousValues: true,
-    });
+      const response = plainToInstance(MessageResponseDto, MessageResponseDto.from(updatedMessage), {
+        excludeExtraneousValues: true,
+      });
 
-    const roomMembers = await this.chatQuery.getChatMembers(updatedMessage.chat_id);
+      await this.notificationsService.sendSocketEvent(
+        await this.getChatMemberIds(updatedMessage.chat_id, userId),
+        NotificationType.UpdateMessage,
+        instanceToPlain(response),
+      );
 
-    const chatMemberIds = formatChatMembers(roomMembers, userId);
-
-    await this.notificationsService.sendSocketEvent(
-      chatMemberIds,
-      NotificationType.UpdateMessage,
-      instanceToPlain(response),
-    );
-
-    return response;
+      return response;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 
   async checkUserAccessToMessage(userId: bigint, messageId: bigint) {
@@ -86,18 +89,16 @@ export class MessagesService {
   }
 
   async remove(id: bigint, userId: bigint) {
-    const message = await this.query.deleteMessage(id);
+    try {
+      const message = await this.query.deleteMessage(id);
 
-    if (!message) throw new InternalServerErrorException('Message not found');
-
-    const roomMembers = await this.chatQuery.getChatMembers(message.chat_id);
-
-    const chatMemberIds = formatChatMembers(roomMembers, userId);
-
-    await this.notificationsService.sendSocketEvent(
-      chatMemberIds,
-      NotificationType.DeleteMessage,
-      { messageId: id.toString(), chatId: message.chat_id.toString() },
-    );
+      await this.notificationsService.sendSocketEvent(
+        await this.getChatMemberIds(message.chat_id, userId),
+        NotificationType.DeleteMessage,
+        { messageId: id.toString(), chatId: message.chat_id.toString() },
+      );
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 }

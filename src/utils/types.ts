@@ -42,16 +42,13 @@ export type ChatMembersCreateInput = {
   chat_id: bigint;
 };
 
-export type CreateMessageType = {
+export type MessageCreateInput = {
   user_id: bigint;
   chat_id: bigint;
   content: string;
 };
 
-export type MessageCreateInput = {
-  message: CreateMessageType;
-  attachments: Omit<MessageAttachments, 'message_id'>[]
-};
+export type AttachmentCreateInput = Omit<MessageAttachments, 'message_id'>;
 
 export type MessageUpdateInput = {
   message_id: bigint;
