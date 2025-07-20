@@ -43,12 +43,9 @@ export class ChatsService {
 
     if (createChatDto.message) {
       const message = await this.messageQuery.createMessage({
-        message: {
-          user_id : user.id,
-          chat_id : chat.id,
-          content : createChatDto.message,
-        },
-        attachments: [],
+        user_id : user.id,
+        chat_id : chat.id,
+        content : createChatDto.message,
       });
 
       await this.query.updateChat(chat.id, createChatDto, message.id);
