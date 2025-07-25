@@ -9,6 +9,7 @@ import { UserRegisterDto } from '@/users/dto/user-register.dto';
 import { UserLoginDto } from '@/auth/dto/user-login.dto';
 import { CurrentUser } from '@/utils/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
+import { ForbidIfUserHas } from '@/utils/decorators/forbid-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -47,11 +48,13 @@ export class AuthController {
   }
 
   @Get('2fa/generate-code')
+  @ForbidIfUserHas('secret')
   async generateCode(@CurrentUser() user: User) {
     return this.authService.generateCode(user);
   }
 
   @Get('2fa/verify-code')
+  @ForbidIfUserHas('secret')
   async verifyCode(@CurrentUser() user: User, @Query('code') code: string) {
     return this.authService.verifyCodeForSetupTwoFactor(user.id, code);
   }

@@ -1,38 +1,18 @@
-import {
-  CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException,
-} from '@nestjs/common';
-import type { Request } from 'express';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ChatsService } from '@/chats/chats.service';
+import { BaseGuard } from '@/auth/guards/base.guard';
 
 @Injectable()
-export class ChatGuard implements CanActivate {
+export class ChatGuard extends BaseGuard implements CanActivate {
   constructor(
-    private jwtService: JwtService,
     private chatService: ChatsService,
-  ) {}
-
-  async canActivate(ctx: ExecutionContext) {
-    const request = ctx.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
-
-    if (!token) {
-      throw new UnauthorizedException();
-    }
-
-    try {
-      const decodedUser = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET,
-      });
-
-      return await this.chatService.checkUserAccessToChat(BigInt(decodedUser.sub), BigInt(request.params.id));
-    } catch {
-      throw new ForbiddenException();
-    }
+    jwtService: JwtService,
+  ) {
+    super(jwtService);
   }
 
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+  async canActivate(ctx: ExecutionContext) {
+    return this.authorize(ctx, async (userId, request) => this.chatService.checkUserAccessToChat(BigInt(userId), BigInt(request.params.id)));
   }
 }

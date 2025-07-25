@@ -26,7 +26,7 @@ export type AuthResponseType = {
 };
 
 export type RequestWithUserType = {
-  user?: Promise<User>
+  user?: User
 } & Request;
 
 export type ChatMembersType = {
