@@ -19,6 +19,7 @@ import { authenticator } from 'otplib';
 import { toDataURL } from 'qrcode';
 import { CACHE_MANAGER, type CacheStore } from '@nestjs/cache-manager';
 import { convertDaysToMs, convertSecondsToMs } from '@/utils/helpers/formatters';
+import { REDIS_KEYS } from '@/constants/redis-keys';
 
 @Injectable()
 export class AuthService {
@@ -120,7 +121,7 @@ export class AuthService {
   }
 
   async verifyCodeForSetupTwoFactor(userId: bigint, token: string) {
-    const key = `2fa:${userId}`;
+    const key = REDIS_KEYS.twoFaSecret(String(userId));
     const secret = await this.cacheManager.get<string>(key);
 
     if (!secret) {
@@ -148,7 +149,7 @@ export class AuthService {
   }
 
   async generateCode(user: User) {
-    const key = `2fa:${user.id}`;
+    const key = REDIS_KEYS.twoFaSecret(String(user.id));
     let secret = await this.cacheManager.get<string>(key);
 
     if (!secret) {
