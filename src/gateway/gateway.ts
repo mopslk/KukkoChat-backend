@@ -1,13 +1,14 @@
 import {
-  OnGatewayConnection,
+  OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException } from '@nestjs/common';
 
 @WebSocketGateway()
-export class AppGateway implements OnGatewayConnection {
+export class AppGateway implements OnGatewayInit {
   @WebSocketServer()
     server: Server;
 
@@ -15,20 +16,18 @@ export class AppGateway implements OnGatewayConnection {
     private readonly jwtService: JwtService,
   ) {}
 
-  // TODO: Рефактор, guards не применяются
-  async handleConnection(client: Socket) {
-    const token = client.handshake.headers.authorization;
-    if (!token) {
-      client.disconnect();
-    }
+  afterInit(server: Server): void {
+    server.use((socket: Socket, next) => {
+      const token = socket.handshake.headers.authorization;
 
-    try {
-      const user = await this.jwtService.verify(token);
-
-      client.join(user.sub);
-    } catch (error) {
-      client.disconnect();
-    }
+      try {
+        const user = this.jwtService.verify(token);
+        socket.join(user.sub);
+      } catch (e) {
+        next(new UnauthorizedException());
+      }
+      next();
+    });
   }
 
   async sendNotification(roomId: string[] | string, event: string, data: any): Promise<void> {
