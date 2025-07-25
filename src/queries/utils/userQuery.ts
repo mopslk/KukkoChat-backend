@@ -57,6 +57,7 @@ export class UserQuery {
     });
   }
 
+  // TODO: Переделать на fingerprint
   async setInfo(user: User, userInfo: PrismaJson.UserInfoType) {
     this.prisma.user.update({
       where: {

@@ -28,16 +28,21 @@ export class UserService {
     await this.query.setTwoFactorAuthenticationSecret(secret, userId);
   }
 
+  validateTokenTimestamp(user: User, decodedUser: JwtPayload): void {
+    if (Number(user.tokens_cleared_at) > convertSecondsToMs(decodedUser.iat)) {
+      throw new UnauthorizedException('Token has been invalidated');
+    }
+  }
+
+  // TODO: Переделать для проверки на fingerprint
   async checkSecurity(request: RequestWithUserType, decodedUser: JwtPayload): Promise<void> {
-    const user = await request.user;
+    const { user } = request;
     const requestInfo: PrismaJson.UserInfoType = {
       ip        : request.ip,
       userAgent : request.headers['user-agent'],
     } as const;
 
-    if (Number(user.tokens_cleared_at) > convertSecondsToMs(decodedUser.iat)) {
-      throw new UnauthorizedException();
-    }
+    this.validateTokenTimestamp(user, decodedUser);
 
     const promises = Object.entries(requestInfo).map(async ([key, value]) => {
       const isValid = await hashCompare(value, user.info[key]);
