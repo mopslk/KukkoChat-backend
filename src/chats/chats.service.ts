@@ -13,6 +13,7 @@ import { ChatResponseDto } from '@/chats/dto/chat-response.dto';
 import { NotificationType } from '@/notifications/enums/events-enum';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { formatChatMembers } from '@/utils/helpers/formatters';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 
 @Injectable()
 export class ChatsService {
@@ -28,7 +29,7 @@ export class ChatsService {
     const chat = await this.query.createChat(type, name);
 
     if (!chat) {
-      throw new InternalServerErrorException('Failed to create chat');
+      throw new InternalServerErrorException(ERROR_MESSAGES.FAILED_CHAT_CREATE);
     }
 
     const chatMembers: ChatMembersCreateInput[] = [
@@ -85,7 +86,7 @@ export class ChatsService {
     const chat = await this.query.getChat(id);
 
     if (chat.type !== ChatType.group) {
-      throw new InternalServerErrorException('Private chat can\'t be updated!');
+      throw new InternalServerErrorException(ERROR_MESSAGES.PRIVATE_CHAT_UPDATE);
     }
 
     const updatedChat = await this.query.updateChat(id, updateChatDto);

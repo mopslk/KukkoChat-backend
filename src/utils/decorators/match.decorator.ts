@@ -5,6 +5,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 
 @ValidatorConstraint({ name: 'Match' })
 export class MatchConstraint implements ValidatorConstraintInterface {
@@ -21,7 +22,7 @@ export function Match(property: string, validationOptions?: ValidationOptions) {
       target  : object.constructor,
       propertyName,
       options : validationOptions ?? {
-        message: 'The $property field must be the same as the $constraint1.',
+        message: ERROR_MESSAGES.MATCH_ERROR,
       },
       constraints : [property],
       validator   : MatchConstraint,

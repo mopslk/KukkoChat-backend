@@ -5,11 +5,12 @@ import { encodeBase64 } from '@/utils/helpers/base64';
 import type { Options as MulterOptions, DiskStorageOptions } from 'multer';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { AttachmentType } from '@prisma/client';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 
 export const fileFilter: MulterOptions['fileFilter'] = (_req, file, callback) => {
   if (!file.originalname.match(/\.(jpg|jpeg|png|gif|mp4|docs)$/)) {
     return callback(new HttpException(
-      `${extname(file.originalname)} file extension are not allowed!`,
+      ERROR_MESSAGES.FILE_EXTENSION_ERROR(extname(file.originalname)),
       HttpStatus.BAD_REQUEST,
     ));
   }

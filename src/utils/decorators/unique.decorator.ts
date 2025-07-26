@@ -8,6 +8,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 
 type PrismaModelNames = Prisma.ModelName;
 
@@ -37,7 +38,7 @@ export function Unique(entity: PrismaModelNames, validationOptions?: ValidationO
       target  : object.constructor,
       propertyName,
       options : validationOptions ?? {
-        message: 'This $property already used.',
+        message: ERROR_MESSAGES.UNIQUE_ERROR,
       },
       constraints : [entity],
       validator   : UniqueConstraint,

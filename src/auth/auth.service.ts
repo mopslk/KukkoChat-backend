@@ -20,6 +20,7 @@ import { toDataURL } from 'qrcode';
 import { CACHE_MANAGER, type CacheStore } from '@nestjs/cache-manager';
 import { convertDaysToMs, convertSecondsToMs } from '@/utils/helpers/formatters';
 import { REDIS_KEYS } from '@/constants/redis-keys';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 
 @Injectable()
 export class AuthService {
@@ -72,7 +73,7 @@ export class AuthService {
     const compareHashTokens = await hashCompare(getTokenSignature(refreshToken), user.refresh_token);
 
     if (!user || !compareHashTokens) {
-      throw new BadRequestException('Invalid refresh token');
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_REFRESH_TOKEN);
     }
 
     if (convertSecondsToMs(Number(userDataFromToken.exp)) - Date.now() <= convertDaysToMs(1)) {
@@ -125,7 +126,7 @@ export class AuthService {
     const secret = await this.cacheManager.get<string>(key);
 
     if (!secret) {
-      throw new BadRequestException('Not found 2fa, regenerate qr-code');
+      throw new BadRequestException(ERROR_MESSAGES.NOT_FOUND_2FA);
     }
 
     const isVerifyCode = authenticator.verify({
@@ -172,7 +173,7 @@ export class AuthService {
       const check2fa = await this.verifyCode(user.secret, code);
 
       if (!check2fa) {
-        throw new BadRequestException('Invalid code!');
+        throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_CODE);
       }
     }
   }

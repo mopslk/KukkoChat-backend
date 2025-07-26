@@ -7,6 +7,7 @@ import type { RequestWithUserType } from '@/utils/types';
 import type { JwtPayload } from 'jsonwebtoken';
 import { convertSecondsToMs } from '@/utils/helpers/formatters';
 import { UserQuery } from '@/queries/utils/userQuery';
+import { ERROR_MESSAGES } from '@/constants/error-messages';
 
 @Injectable()
 export class UserService {
@@ -30,7 +31,7 @@ export class UserService {
 
   validateTokenTimestamp(user: User, decodedUser: JwtPayload): void {
     if (Number(user.tokens_cleared_at) > convertSecondsToMs(decodedUser.iat)) {
-      throw new UnauthorizedException('Token has been invalidated');
+      throw new UnauthorizedException(ERROR_MESSAGES.TOKEN_INVALIDATED);
     }
   }
 
