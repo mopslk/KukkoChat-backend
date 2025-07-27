@@ -21,6 +21,7 @@ import { CACHE_MANAGER, type CacheStore } from '@nestjs/cache-manager';
 import { convertDaysToMs, convertSecondsToMs } from '@/utils/helpers/formatters';
 import { REDIS_KEYS } from '@/constants/redis-keys';
 import { ERROR_MESSAGES } from '@/constants/error-messages';
+import { decrypt, encrypt } from '@/utils/helpers/encrypt';
 
 @Injectable()
 export class AuthService {
@@ -129,20 +130,17 @@ export class AuthService {
       throw new BadRequestException(ERROR_MESSAGES.NOT_FOUND_2FA);
     }
 
-    const isVerifyCode = authenticator.verify({
-      token,
-      secret,
-    });
+    const isVerifyCode = this.verifyCode(secret, token);
 
     if (isVerifyCode) {
-      await this.userService.setTwoFactorAuthenticationSecret(secret, userId);
+      await this.userService.setTwoFactorAuthenticationSecret(await encrypt(secret), userId);
       await this.cacheManager.del(key);
     }
 
     return isVerifyCode;
   }
 
-  async verifyCode(secret: string, token: string) {
+  verifyCode(secret: string, token: string) {
     return authenticator.verify({
       token,
       secret,
@@ -170,7 +168,7 @@ export class AuthService {
     }
 
     if (user.secret && code) {
-      const check2fa = await this.verifyCode(user.secret, code);
+      const check2fa = this.verifyCode(await decrypt(user.secret), code);
 
       if (!check2fa) {
         throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_CODE);
