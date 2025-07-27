@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Get, Ip, Headers, Post, Query,
+  Body, Controller, Get, Post, Query,
 } from '@nestjs/common';
 import type { AuthResponseType } from '@/utils/types';
 import { AuthService } from '@/auth/auth.service';
@@ -10,6 +10,7 @@ import { UserLoginDto } from '@/auth/dto/user-login.dto';
 import { CurrentUser } from '@/utils/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { ForbidIfUserHas } from '@/utils/decorators/forbid-user.decorator';
+import { TwoFactorLoginDTO } from '@/auth/dto/2fa-login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -19,20 +20,21 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  async login(
-  @Body() userLoginDto: UserLoginDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-  ) {
+  async login(@Body() userLoginDto: UserLoginDto) {
     const user = await this.authService.validateUser(userLoginDto);
 
-    if (!user) {
-      throw new BadRequestException('Invalid login or password!');
+    if (user.secret) {
+      const tempToken = await this.authService.generateTemp2FAToken(user.id);
+      return { need2fa: true, tempToken };
     }
 
-    await this.authService.checkingForTwoFactor(user, userLoginDto?.code);
+    return this.authService.login(user);
+  }
 
-    return this.authService.login(user, { ip, userAgent });
+  @Public()
+  @Post('2fa/verify-code')
+  async verify2faForLogin(@Body() twoFactorLoginDTO: TwoFactorLoginDTO): Promise<AuthResponseType> {
+    return this.authService.verify2FaForLogin(twoFactorLoginDTO);
   }
 
   @Public()
@@ -47,15 +49,15 @@ export class AuthController {
     return this.authService.register(credentials);
   }
 
-  @Get('2fa/generate-code')
+  @Get('2fa/generate-secret')
   @ForbidIfUserHas('secret')
   async generateCode(@CurrentUser() user: User) {
-    return this.authService.generateCode(user);
+    return this.authService.generate2FaSecret(user);
   }
 
-  @Get('2fa/verify-code')
+  @Get('2fa/setup')
   @ForbidIfUserHas('secret')
-  async verifyCode(@CurrentUser() user: User, @Query('code') code: string) {
-    return this.authService.verifyCodeForSetupTwoFactor(user.id, code);
+  async setup2Fa(@CurrentUser() user: User, @Query('code') code: string) {
+    return this.authService.setupTwoFactor(user.id, code);
   }
 }

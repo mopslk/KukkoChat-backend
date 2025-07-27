@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
@@ -22,6 +21,8 @@ import { convertDaysToMs, convertSecondsToMs } from '@/utils/helpers/formatters'
 import { REDIS_KEYS } from '@/constants/redis-keys';
 import { ERROR_MESSAGES } from '@/constants/error-messages';
 import { decrypt, encrypt } from '@/utils/helpers/encrypt';
+import { CACHE_TTL } from '@/constants/cache-ttl';
+import { TwoFactorLoginDTO } from '@/auth/dto/2fa-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -31,14 +32,14 @@ export class AuthService {
     @Inject(CACHE_MANAGER) private cacheManager: CacheStore,
   ) {}
 
-  async validateUser(userLoginDto: UserLoginDto): Promise<User | null> {
+  async validateUser(userLoginDto: UserLoginDto): Promise<User> {
     const user = await this.userService.findBy('login', userLoginDto.login);
     const matchPasswords = await hashCompare(userLoginDto.password, user.password);
 
     if (user && matchPasswords) {
       return user;
     }
-    return null;
+    throw new BadRequestException(ERROR_MESSAGES.INVALID_LOGIN_CREDENTIALS);
   }
 
   async generateTokens(userId: bigint, onlyAccessToken?: boolean): Promise<TokensResponseType> {
@@ -62,6 +63,15 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  async generateTemp2FAToken(userId: bigint): Promise<string> {
+    const tempToken = crypto.randomUUID();
+    const key = REDIS_KEYS.twoFaTempToken(tempToken);
+
+    await this.cacheManager.set(key, userId.toString(), CACHE_TTL.minute(5));
+
+    return tempToken;
   }
 
   async refresh(refreshToken: string): Promise<TokensResponseType> {
@@ -92,12 +102,13 @@ export class AuthService {
     };
   }
 
-  async login(user: User, userInfo: PrismaJson.UserInfoType): Promise<AuthResponseType> {
+  async login(user: User): Promise<AuthResponseType> {
     const tokens = await this.generateTokens(user.id);
 
     await this.userService.updateUserRefreshToken(user, tokens.refreshToken);
 
-    await this.userService.setInfo(user, userInfo);
+    // TODO: Переделать на fingerprint
+    // await this.userService.setInfo(user, userInfo);
 
     return {
       user: plainToInstance(UserResponseDto, user),
@@ -122,7 +133,7 @@ export class AuthService {
     }
   }
 
-  async verifyCodeForSetupTwoFactor(userId: bigint, token: string) {
+  async setupTwoFactor(userId: bigint, token: string) {
     const key = REDIS_KEYS.twoFaSecret(String(userId));
     const secret = await this.cacheManager.get<string>(key);
 
@@ -147,7 +158,7 @@ export class AuthService {
     });
   }
 
-  async generateCode(user: User) {
+  async generate2FaSecret(user: User) {
     const key = REDIS_KEYS.twoFaSecret(String(user.id));
     let secret = await this.cacheManager.get<string>(key);
 
@@ -162,17 +173,21 @@ export class AuthService {
     return toDataURL(otpAuthUrl);
   }
 
-  async checkingForTwoFactor(user: User, code?: string): Promise<void> {
-    if (user.secret && !code) {
-      throw new UnauthorizedException('2fa');
-    }
+  async verify2FaForLogin(twoFactorLoginDTO: TwoFactorLoginDTO): Promise<AuthResponseType> {
+    const { tempToken, code } = twoFactorLoginDTO;
+    const tempTokenKey = REDIS_KEYS.twoFaTempToken(tempToken);
+    const userId = await this.cacheManager.get<string | undefined>(tempTokenKey);
 
-    if (user.secret && code) {
-      const check2fa = this.verifyCode(await decrypt(user.secret), code);
+    if (!userId) throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_TEMP_TOKEN);
 
-      if (!check2fa) {
-        throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_CODE);
-      }
-    }
+    const user = await this.userService.findBy('id', userId);
+
+    const isValid = this.verifyCode(await decrypt(user.secret), code);
+
+    if (!isValid) throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_CODE);
+
+    await this.cacheManager.del(tempTokenKey);
+
+    return this.login(user);
   }
 }
