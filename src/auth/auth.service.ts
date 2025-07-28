@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
@@ -16,20 +15,20 @@ import { UserResponseDto } from '@/users/dto/user-response.dto';
 import { UserLoginDto } from '@/auth/dto/user-login.dto';
 import { authenticator } from 'otplib';
 import { toDataURL } from 'qrcode';
-import { CACHE_MANAGER, type CacheStore } from '@nestjs/cache-manager';
 import { convertDaysToMs, convertSecondsToMs } from '@/utils/helpers/formatters';
 import { REDIS_KEYS } from '@/constants/redis-keys';
 import { ERROR_MESSAGES } from '@/constants/error-messages';
 import { decrypt, encrypt } from '@/utils/helpers/encrypt';
 import { CACHE_TTL } from '@/constants/cache-ttl';
 import { TwoFactorLoginDTO } from '@/auth/dto/2fa-login.dto';
+import { CacheService } from '@/cache/cache.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private userService: UserService,
     private jwtService: JwtService,
-    @Inject(CACHE_MANAGER) private cacheManager: CacheStore,
+    private cacheService: CacheService,
   ) {}
 
   async validateUser(userLoginDto: UserLoginDto): Promise<User> {
@@ -69,7 +68,7 @@ export class AuthService {
     const tempToken = crypto.randomUUID();
     const key = REDIS_KEYS.twoFaTempToken(tempToken);
 
-    await this.cacheManager.set(key, userId.toString(), CACHE_TTL.minute(5));
+    await this.cacheService.set(key, userId.toString(), CACHE_TTL.minute(5));
 
     return tempToken;
   }
@@ -135,7 +134,7 @@ export class AuthService {
 
   async setupTwoFactor(userId: bigint, token: string) {
     const key = REDIS_KEYS.twoFaSecret(String(userId));
-    const secret = await this.cacheManager.get<string>(key);
+    const secret = await this.cacheService.get<string>(key);
 
     if (!secret) {
       throw new BadRequestException(ERROR_MESSAGES.NOT_FOUND_2FA);
@@ -145,7 +144,7 @@ export class AuthService {
 
     if (isVerifyCode) {
       await this.userService.setTwoFactorAuthenticationSecret(await encrypt(secret), userId);
-      await this.cacheManager.del(key);
+      await this.cacheService.delete(key);
     }
 
     return isVerifyCode;
@@ -160,11 +159,11 @@ export class AuthService {
 
   async generate2FaSecret(user: User) {
     const key = REDIS_KEYS.twoFaSecret(String(user.id));
-    let secret = await this.cacheManager.get<string>(key);
+    let secret = await this.cacheService.get<string>(key);
 
     if (!secret) {
       const newSecret = authenticator.generateSecret(32);
-      await this.cacheManager.set(key, newSecret);
+      await this.cacheService.set(key, newSecret);
 
       secret = newSecret;
     }
@@ -176,7 +175,7 @@ export class AuthService {
   async verify2FaForLogin(twoFactorLoginDTO: TwoFactorLoginDTO): Promise<AuthResponseType> {
     const { tempToken, code } = twoFactorLoginDTO;
     const tempTokenKey = REDIS_KEYS.twoFaTempToken(tempToken);
-    const userId = await this.cacheManager.get<string | undefined>(tempTokenKey);
+    const userId = await this.cacheService.get<string | undefined>(tempTokenKey);
 
     if (!userId) throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_TEMP_TOKEN);
 
@@ -186,7 +185,7 @@ export class AuthService {
 
     if (!isValid) throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_CODE);
 
-    await this.cacheManager.del(tempTokenKey);
+    await this.cacheService.delete(tempTokenKey);
 
     return this.login(user);
   }
