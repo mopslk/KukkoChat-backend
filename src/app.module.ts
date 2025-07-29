@@ -12,6 +12,8 @@ import { FilesModule } from '@/files/files.module';
 import { GatewayModule } from '@/gateway/gateway.module';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { CacheModule } from '@/cache/cache.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { throttleConfig } from '@/config/throttle.config';
 import { multerModuleConfig } from '@/config/storage.config';
 
 @Module({
@@ -26,12 +28,17 @@ import { multerModuleConfig } from '@/config/storage.config';
     GatewayModule,
     NotificationsModule,
     CacheModule,
+    ThrottlerModule.forRoot(throttleConfig),
   ],
   controllers : [],
   providers   : [
     {
       provide  : APP_GUARD,
       useClass : AuthGuard,
+    },
+    {
+      provide  : APP_GUARD,
+      useClass : ThrottlerGuard,
     },
     UniqueConstraint,
   ],

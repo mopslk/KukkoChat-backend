@@ -11,7 +11,10 @@ import { CurrentUser } from '@/utils/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { ForbidIfUserHas } from '@/utils/decorators/forbid-user.decorator';
 import { TwoFactorLoginDTO } from '@/auth/dto/2fa-login.dto';
+import { Throttle } from '@nestjs/throttler';
+import { CACHE_TTL } from '@/constants/cache-ttl';
 
+@Throttle({ default: { ttl: CACHE_TTL.minute(1), limit: 5 } })
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -38,25 +41,27 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: CACHE_TTL.minute(1), limit: 10 } })
   @Post('refresh')
   async refresh(@Body() refreshDto: RefreshDto) {
     return this.authService.refresh(refreshDto.refreshToken);
   }
 
-  @Post('register')
   @Public()
+  @Throttle({ default: { ttl: CACHE_TTL.hour(1), limit: 5 } })
+  @Post('register')
   async register(@Body() credentials: UserRegisterDto): Promise<AuthResponseType> {
     return this.authService.register(credentials);
   }
 
-  @Get('2fa/generate-secret')
   @ForbidIfUserHas('secret')
+  @Get('2fa/generate-secret')
   async generateCode(@CurrentUser() user: User) {
     return this.authService.generate2FaSecret(user);
   }
 
-  @Get('2fa/setup')
   @ForbidIfUserHas('secret')
+  @Get('2fa/setup')
   async setup2Fa(@CurrentUser() user: User, @Query('code') code: string) {
     return this.authService.setupTwoFactor(user.id, code);
   }
