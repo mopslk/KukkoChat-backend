@@ -12,6 +12,7 @@ import { FilesModule } from '@/files/files.module';
 import { GatewayModule } from '@/gateway/gateway.module';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { CacheModule } from '@/cache/cache.module';
+import { multerModuleConfig } from '@/config/storage.config';
 
 @Module({
   imports: [
@@ -19,9 +20,7 @@ import { CacheModule } from '@/cache/cache.module';
     AuthModule,
     PrismaModule,
     ChatsModule,
-    MulterModule.register({
-      dest: process.env.BASE_FILES_PATH,
-    }),
+    MulterModule.register(multerModuleConfig),
     MessagesModule,
     FilesModule,
     GatewayModule,

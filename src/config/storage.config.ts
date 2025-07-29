@@ -1,6 +1,7 @@
 import { diskStorage } from 'multer';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 import { editFileName, fileFilter, getDestinationFolder } from '@/utils/helpers/file';
+import { MulterModuleOptions } from '@nestjs/platform-express';
 
 export const multerConfig: MulterOptions = {
   storage: diskStorage({
@@ -11,4 +12,8 @@ export const multerConfig: MulterOptions = {
     filename: editFileName,
   }),
   fileFilter,
+};
+
+export const multerModuleConfig: MulterModuleOptions = {
+  dest: process.env.BASE_FILES_PATH,
 };
