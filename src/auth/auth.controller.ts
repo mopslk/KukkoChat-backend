@@ -69,4 +69,9 @@ export class AuthController {
   async setup2Fa(@CurrentUser() user: User, @Query('code') code: string) {
     return this.authService.setupTwoFactor(user.id, code);
   }
+
+  @Get('/sessions')
+  async getSessions(@CurrentUser() user: User) {
+    return this.authService.getSessions(user.id);
+  }
 }

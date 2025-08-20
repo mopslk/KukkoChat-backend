@@ -236,4 +236,10 @@ export class AuthService {
   async createSession(data: SessionData) {
     return this.query.createSession(data);
   }
+
+  async getSessions(userId: bigint): Promise<string[]> {
+    const devices = await this.query.getSessions(userId);
+
+    return devices.map((device) => device.device_name);
+  }
 }

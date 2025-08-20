@@ -33,4 +33,15 @@ export class AuthQuery {
       },
     });
   }
+
+  async getSessions(userId: bigint) {
+    return this.prisma.session.findMany({
+      where: {
+        user_id: userId,
+      },
+      select: {
+        device_name: true,
+      },
+    });
+  }
 }
