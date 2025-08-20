@@ -27,6 +27,12 @@ export class UserRegisterDto {
   @IsOptional()
     avatar: string | null;
 
+  @IsString()
+    deviceId: string;
+
+  @IsString()
+    deviceName: string;
+
   setPassword(value: string): void {
     this.password = value;
   }

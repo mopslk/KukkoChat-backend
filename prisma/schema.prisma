@@ -25,6 +25,7 @@ model User {
   info              Json         @default("{}")
   Message           Message[]
   ChatMember        ChatMember[]
+  Session           Session[]
 
   @@map("users")
 }
@@ -101,4 +102,15 @@ enum AttachmentType {
   video
   gif
   docs
+}
+
+model Session {
+  user_id     BigInt
+  user        User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  device_id   String
+  device_name String
+
+  @@id([user_id, device_id])
+  @@index([device_id, user_id])
+  @@map("sessions")
 }

@@ -22,12 +22,12 @@ export class BaseGuard {
 
   protected async authorize(
     ctx: ExecutionContext,
-    accessCheck: (userId: string | number, request: RequestWithUserType) => Promise<boolean>,
+    accessCheck: (userId: string | number, request: RequestWithUserType, user: JwtPayload) => Promise<boolean>,
   ): Promise<boolean> {
     const request = ctx.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
     const user = await this.authenticate(token);
 
-    return accessCheck(user.sub, request);
+    return accessCheck(user.sub, request, user);
   }
 }

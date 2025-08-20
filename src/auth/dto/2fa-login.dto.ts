@@ -8,4 +8,12 @@ export class TwoFactorLoginDTO {
   @IsNotEmpty()
   @IsString()
     code: string;
+
+  @IsNotEmpty()
+  @IsString()
+    deviceId: string;
+
+  @IsNotEmpty()
+  @IsString()
+    deviceName: string;
 }

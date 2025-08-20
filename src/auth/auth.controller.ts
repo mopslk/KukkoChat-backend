@@ -25,13 +25,17 @@ export class AuthController {
   @Post('login')
   async login(@Body() userLoginDto: UserLoginDto) {
     const user = await this.authService.validateUser(userLoginDto);
+    const deviceData = userLoginDto.getDeviceData();
 
     if (user.secret) {
-      const tempToken = await this.authService.generateTemp2FAToken(user.id);
+      const tempToken = await this.authService.generateTemp2FAToken({
+        userId: user.id,
+        ...deviceData,
+      });
       return { need2fa: true, tempToken };
     }
 
-    return this.authService.login(user);
+    return this.authService.login(user, deviceData);
   }
 
   @Public()

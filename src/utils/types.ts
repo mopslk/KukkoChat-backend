@@ -54,3 +54,12 @@ export type MessageUpdateInput = {
   message_id: bigint;
   content: string;
 };
+
+export type DeviceData = {
+  deviceId: string;
+  deviceName: string;
+};
+
+export type SessionData = {
+  userId: bigint;
+} & DeviceData;

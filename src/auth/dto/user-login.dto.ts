@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString } from 'class-validator';
+import { DeviceData } from '@/utils/types';
 
 export class UserLoginDto {
   @IsNotEmpty()
@@ -9,5 +10,18 @@ export class UserLoginDto {
   @IsString()
     password: string;
 
-  code?: string;
+  @IsNotEmpty()
+  @IsString()
+    deviceId: string;
+
+  @IsNotEmpty()
+  @IsString()
+    deviceName: string;
+
+  getDeviceData(): DeviceData {
+    return {
+      deviceId   : this.deviceId,
+      deviceName : this.deviceName,
+    };
+  }
 }

@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
+  InternalServerErrorException, UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
@@ -10,7 +10,13 @@ import { UserService } from '@/users/user.service';
 import { hashCompare } from '@/utils/helpers/hash';
 import { getTokenSignature } from '@/utils/helpers/token';
 import { UserRegisterDto } from '@/users/dto/user-register.dto';
-import type { AuthResponseType, TokensResponseType } from '@/utils/types';
+import type {
+  AuthResponseType,
+  DeviceData,
+  RequestWithUserType,
+  SessionData,
+  TokensResponseType,
+} from '@/utils/types';
 import { UserResponseDto } from '@/users/dto/user-response.dto';
 import { UserLoginDto } from '@/auth/dto/user-login.dto';
 import { authenticator } from 'otplib';
@@ -22,6 +28,8 @@ import { decrypt, encrypt } from '@/utils/helpers/encrypt';
 import { CACHE_TTL } from '@/constants/cache-ttl';
 import { TwoFactorLoginDTO } from '@/auth/dto/2fa-login.dto';
 import { CacheService } from '@/cache/cache.service';
+import type { JwtPayload } from 'jsonwebtoken';
+import { AuthQuery } from '@/queries/utils/authQuery';
 
 @Injectable()
 export class AuthService {
@@ -29,14 +37,19 @@ export class AuthService {
     private userService: UserService,
     private jwtService: JwtService,
     private cacheService: CacheService,
+    private query: AuthQuery,
   ) {}
 
   async validateUser(userLoginDto: UserLoginDto): Promise<User> {
-    const user = await this.userService.findBy('login', userLoginDto.login);
-    const matchPasswords = await hashCompare(userLoginDto.password, user.password);
+    try {
+      const user = await this.userService.findBy('login', userLoginDto.login);
+      const matchPasswords = await hashCompare(userLoginDto.password, user.password);
 
-    if (user && matchPasswords) {
-      return user;
+      if (user && matchPasswords) {
+        return user;
+      }
+    } catch (error) {
+      throw new BadRequestException(ERROR_MESSAGES.AUTHENTICATE_FAILED);
     }
     throw new BadRequestException(ERROR_MESSAGES.INVALID_LOGIN_CREDENTIALS);
   }
@@ -64,11 +77,12 @@ export class AuthService {
     };
   }
 
-  async generateTemp2FAToken(userId: bigint): Promise<string> {
+  async generateTemp2FAToken(data: SessionData): Promise<string> {
     const tempToken = crypto.randomUUID();
     const key = REDIS_KEYS.twoFaTempToken(tempToken);
+    const { userId, ...deviceData } = data;
 
-    await this.cacheService.set(key, userId.toString(), CACHE_TTL.minute(5));
+    await this.cacheService.set(key, { userId: userId.toString(), ...deviceData }, CACHE_TTL.minute(5));
 
     return tempToken;
   }
@@ -101,13 +115,15 @@ export class AuthService {
     };
   }
 
-  async login(user: User): Promise<AuthResponseType> {
+  async login(user: User, deviceData: DeviceData): Promise<AuthResponseType> {
     const tokens = await this.generateTokens(user.id);
 
     await this.userService.updateUserRefreshToken(user, tokens.refreshToken);
 
-    // TODO: Переделать на fingerprint
-    // await this.userService.setInfo(user, userInfo);
+    await this.createSession({
+      userId: user.id,
+      ...deviceData,
+    });
 
     return {
       user: plainToInstance(UserResponseDto, user),
@@ -115,11 +131,18 @@ export class AuthService {
     };
   }
 
-  async register(credentials: UserRegisterDto): Promise<AuthResponseType> {
+  async register(data: UserRegisterDto): Promise<AuthResponseType> {
     try {
-      const user = await this.userService.createUser(credentials);
+      const { deviceId, deviceName, ...credentials } = data;
+      const user = await this.userService.createUser(plainToInstance(UserRegisterDto, credentials));
 
       const tokens = await this.generateTokens(user.id);
+
+      await this.createSession({
+        userId: user.id,
+        deviceId,
+        deviceName,
+      });
 
       await this.userService.updateUserRefreshToken(user, tokens.refreshToken);
 
@@ -175,7 +198,8 @@ export class AuthService {
   async verify2FaForLogin(twoFactorLoginDTO: TwoFactorLoginDTO): Promise<AuthResponseType> {
     const { tempToken, code } = twoFactorLoginDTO;
     const tempTokenKey = REDIS_KEYS.twoFaTempToken(tempToken);
-    const userId = await this.cacheService.get<string | undefined>(tempTokenKey);
+    const sessionData = await this.cacheService.get<SessionData>(tempTokenKey);
+    const { userId, ...deviceData } = sessionData;
 
     if (!userId) throw new BadRequestException(ERROR_MESSAGES.INVALID_2FA_TEMP_TOKEN);
 
@@ -187,6 +211,29 @@ export class AuthService {
 
     await this.cacheService.delete(tempTokenKey);
 
-    return this.login(user);
+    return this.login(user, deviceData);
+  }
+
+  validateTokenTimestamp(user: User, decodedUser: JwtPayload): void {
+    if (Number(user.tokens_cleared_at) > convertSecondsToMs(decodedUser.iat)) {
+      throw new UnauthorizedException(ERROR_MESSAGES.TOKEN_INVALIDATED);
+    }
+  }
+
+  async assertSessionSecurity(request: RequestWithUserType, decodedUser: JwtPayload, deviceId: string): Promise<void> {
+    const { user } = request;
+
+    this.validateTokenTimestamp(user, decodedUser);
+
+    const session = await this.query.getSession(user.id, deviceId);
+
+    if (!session) {
+      await this.userService.removeRefreshToken(user.id);
+      throw new UnauthorizedException();
+    }
+  }
+
+  async createSession(data: SessionData) {
+    return this.query.createSession(data);
   }
 }

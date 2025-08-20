@@ -11,4 +11,5 @@ export const ERROR_MESSAGES = {
   FILE_EXTENSION_ERROR      : (extension: string) => `${extension} file extension are not allowed`,
   INVALID_LOGIN_CREDENTIALS : 'Invalid login or password',
   INVALID_2FA_TEMP_TOKEN    : 'Invalid or expired 2FA token',
+  AUTHENTICATE_FAILED       : 'Authentication failed',
 };
