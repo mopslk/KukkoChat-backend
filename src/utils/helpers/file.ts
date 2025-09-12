@@ -6,6 +6,7 @@ import type { Options as MulterOptions, DiskStorageOptions } from 'multer';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { AttachmentType } from '@prisma/client';
 import { ERROR_MESSAGES } from '@/constants/error-messages';
+import { filesConfig } from '@/config/files.config';
 
 export const fileFilter: MulterOptions['fileFilter'] = (_req, file, callback) => {
   if (!file.originalname.match(/\.(jpg|jpeg|png|gif|mp4|docs)$/)) {
@@ -38,7 +39,7 @@ async function getLastCreatedFolder(directoryPath: string): Promise<string | nul
 }
 
 export async function getDestinationFolder() {
-  const basePath = process.env.BASE_FILES_PATH;
+  const { basePath } = filesConfig();
   const currentDate = new Date().toLocaleDateString();
 
   let lastFolderName = await getLastCreatedFolder(basePath);
@@ -57,10 +58,11 @@ export async function getDestinationFolder() {
 }
 
 export function getFileUrl(path: string): string {
-  const normalizedBasePath = process.env.BASE_FILES_PATH.replace(/^\.\//, '');
+  const { basePath, baseUrl } = filesConfig();
+  const normalizedBasePath = basePath.replace(/^\.\//, '');
   const pathWithoutBasePath = path.replace(new RegExp(`^${normalizedBasePath}/?`), '');
 
-  return join(process.env.BASE_URL, 'api', pathWithoutBasePath);
+  return join(baseUrl, 'api', pathWithoutBasePath);
 }
 
 export function getFileType(fileName: string): AttachmentType {

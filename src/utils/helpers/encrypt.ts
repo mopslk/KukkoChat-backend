@@ -1,8 +1,9 @@
 import * as crypto from 'crypto';
 import { Readable, Writable } from 'stream';
+import { keysConfig } from '@/config/keys.config';
 
 const ALGORITHM = 'aes-256-cbc';
-const KEY = process.env.ENCRYPT_PRIVATE_KEY;
+const { encryptPrivate: KEY } = keysConfig();
 
 export function encrypt(text: string): Promise<string> {
   const iv = crypto.randomBytes(16);

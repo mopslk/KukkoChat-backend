@@ -5,12 +5,11 @@ import { AuthService } from '@/auth/auth.service';
 import { AuthController } from '@/auth/auth.controller';
 import { QueriesModule } from '@/queries/queries.module';
 import { AuthQuery } from '@/queries/utils/authQuery';
+import { jwtConfig } from '@/config/auth.config';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET_KEY,
-    }),
+    JwtModule.register(jwtConfig),
     UsersModule,
     QueriesModule,
   ],

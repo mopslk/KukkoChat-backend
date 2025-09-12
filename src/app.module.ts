@@ -13,8 +13,11 @@ import { GatewayModule } from '@/gateway/gateway.module';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { CacheModule } from '@/cache/cache.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { throttleConfig } from '@/config/throttle.config';
-import { multerModuleConfig } from '@/config/storage.config';
+import { filesConfig, multerModuleConfig } from '@/config/storage.config';
+import { ConfigModule } from '@nestjs/config';
+import { postgresConfig, redisConfig } from '@/config/database.config';
+import { keysConfig } from '@/config/keys.config';
+import { throttleConfig } from '@/config/auth.config';
 
 @Module({
   imports: [
@@ -29,6 +32,10 @@ import { multerModuleConfig } from '@/config/storage.config';
     NotificationsModule,
     CacheModule,
     ThrottlerModule.forRoot(throttleConfig),
+    ConfigModule.forRoot({
+      load     : [postgresConfig, redisConfig, keysConfig, filesConfig],
+      isGlobal : true,
+    }),
   ],
   controllers : [],
   providers   : [

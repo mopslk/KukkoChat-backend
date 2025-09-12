@@ -1,14 +1,20 @@
 import {
-  Controller, Get, Param, Res,
+  Controller, Get, Inject, Param, Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { join } from 'path';
 import { Public } from '@/utils/decorators/public.decorator';
+import { filesConfig } from '@/config/storage.config';
+import { ConfigType } from '@nestjs/config';
 import { FilesService } from './files.service';
 
 @Controller()
 export class FilesController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(
+    private readonly filesService: FilesService,
+    @Inject(filesConfig.KEY)
+    private storageConfig: ConfigType<typeof filesConfig>,
+  ) {}
 
   @Get(':folder/:file')
   @Public()
@@ -22,6 +28,6 @@ export class FilesController {
       return;
     }
 
-    res.sendFile(path, { root: process.env.BASE_FILES_PATH });
+    res.sendFile(path, { root: this.storageConfig.basePath });
   }
 }

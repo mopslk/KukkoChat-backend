@@ -1,5 +1,5 @@
 import {
-  BadRequestException,
+  BadRequestException, Inject,
   Injectable,
   InternalServerErrorException, UnauthorizedException,
 } from '@nestjs/common';
@@ -30,6 +30,8 @@ import { TwoFactorLoginDTO } from '@/auth/dto/2fa-login.dto';
 import { CacheService } from '@/cache/cache.service';
 import type { JwtPayload } from 'jsonwebtoken';
 import { AuthQuery } from '@/queries/utils/authQuery';
+import { keysConfig } from '@/config/keys.config';
+import { ConfigType } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +40,8 @@ export class AuthService {
     private jwtService: JwtService,
     private cacheService: CacheService,
     private query: AuthQuery,
+    @Inject(keysConfig.KEY)
+    private jwtKeyConfig: ConfigType<typeof keysConfig>,
   ) {}
 
   async validateUser(userLoginDto: UserLoginDto): Promise<User> {
@@ -58,7 +62,7 @@ export class AuthService {
     const payload = { sub: userId.toString() };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret    : process.env.JWT_SECRET_KEY,
+      secret    : this.jwtKeyConfig.jwtSecret,
       expiresIn : '30m',
     });
 
@@ -67,7 +71,7 @@ export class AuthService {
     }
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret    : process.env.JWT_REFRESH_SECRET_KEY,
+      secret    : this.jwtKeyConfig.jwtRefreshSecret,
       expiresIn : '7d',
     });
 
@@ -89,7 +93,7 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<TokensResponseType> {
     const userDataFromToken = await this.jwtService.verifyAsync(refreshToken, {
-      secret: process.env.JWT_REFRESH_SECRET_KEY,
+      secret: this.jwtKeyConfig.jwtRefreshSecret,
     });
 
     const user = await this.userService.findBy('id', BigInt(userDataFromToken.sub));

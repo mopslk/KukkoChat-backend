@@ -1,5 +1,5 @@
 import { Module, Global } from '@nestjs/common';
-import { redisConfig } from '@/config/cache.config';
+import { redisCacheConfig } from '@/config/cache.config';
 import { CacheService } from './cache.service';
 
 @Global()
@@ -7,7 +7,7 @@ import { CacheService } from './cache.service';
   providers: [
     {
       provide    : 'CACHE_INSTANCE',
-      useFactory : redisConfig,
+      useFactory : redisCacheConfig,
     },
     CacheService,
   ],
