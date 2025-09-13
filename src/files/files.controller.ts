@@ -4,8 +4,8 @@ import {
 import type { Response } from 'express';
 import { join } from 'path';
 import { Public } from '@/utils/decorators/public.decorator';
-import { filesConfig } from '@/config/storage.config';
 import { ConfigType } from '@nestjs/config';
+import { filesConfig } from '@/config/files.config';
 import { FilesService } from './files.service';
 
 @Controller()
